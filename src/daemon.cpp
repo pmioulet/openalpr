@@ -29,7 +29,7 @@ SafeQueue<cv::Mat> framesQueue;
 
 // Prototypes
 void streamRecognitionThread(void* arg);
-bool writeToQueue(std::string jsonResult);
+bool writeToQueue(std::string beanstalk_host, int beanstalk_port, std::string beanstalk_queue, std::string jsonResult);
 bool uploadPost(CURL* curl, std::string url, std::string data);
 void dataUploadThread(void* arg);
 
@@ -37,10 +37,6 @@ void dataUploadThread(void* arg);
 const std::string ALPRD_CONFIG_FILE_NAME="alprd.conf";
 const std::string OPENALPR_CONFIG_FILE_NAME="openalpr.conf";
 const std::string DEFAULT_LOG_FILE_PATH="/var/log/alprd.log";
-
-const std::string BEANSTALK_QUEUE_HOST="127.0.0.1";
-const int BEANSTALK_PORT=11300;
-const std::string BEANSTALK_TUBE_NAME="alprd";
 
 
 struct CaptureThreadData
@@ -59,11 +55,17 @@ struct CaptureThreadData
   bool output_images;
   std::string output_image_folder;
   int top_n;
+  std::string beanstalk_host;
+  int beanstalk_port;
+  std::string beanstalk_queue;
 };
 
 struct UploadThreadData
 {
   std::string upload_url;
+  std::string beanstalk_host;
+  int beanstalk_port;
+  std::string beanstalk_queue;
 };
 
 void segfault_handler(int sig) {
@@ -207,6 +209,9 @@ int main( int argc, const char** argv )
       tdata->site_id = daemon_config.site_id;
       tdata->analysis_threads = daemon_config.analysis_threads;
       tdata->top_n = daemon_config.topn;
+      tdata->beanstalk_host = daemon_config.beanstalk_host;
+      tdata->beanstalk_port = daemon_config.beanstalk_port;
+      tdata->beanstalk_queue = daemon_config.beanstalk_queue;
       tdata->pattern = daemon_config.pattern;
       tdata->clock_on = clockOn;
       
@@ -218,6 +223,9 @@ int main( int argc, const char** argv )
         // Kick off the data upload thread
 	      UploadThreadData* udata = new UploadThreadData();
         udata->upload_url = daemon_config.upload_url;
+        udata->beanstalk_host = daemon_config.beanstalk_host;
+        udata->beanstalk_port = daemon_config.beanstalk_port;
+        udata->beanstalk_queue = daemon_config.beanstalk_queue;
         tthread::thread* thread_upload = new tthread::thread(dataUploadThread, (void*) udata );
 
         threads.push_back(thread_upload);
@@ -307,7 +315,7 @@ void processingThread(void* arg)
         LOG4CPLUS_DEBUG(logger, "Writing plate " << results.plates[j].bestPlate.characters << " (" <<  uuid << ") to queue.");
       }
 
-      writeToQueue(response);
+      writeToQueue(tdata->beanstalk_host, tdata->beanstalk_port, tdata->beanstalk_queue, response);
     }
     usleep(10000);
   }
@@ -360,12 +368,12 @@ void streamRecognitionThread(void* arg)
 }
 
 
-bool writeToQueue(std::string jsonResult)
+bool writeToQueue(std::string beanstalk_host, int beanstalk_port, std::string beanstalk_queue, std::string jsonResult)
 {
   try
   {
-    Beanstalk::Client client(BEANSTALK_QUEUE_HOST, BEANSTALK_PORT);
-    client.use(BEANSTALK_TUBE_NAME);
+    Beanstalk::Client client(beanstalk_host, beanstalk_port);
+    client.use(beanstalk_queue);
 
     int id = client.put(jsonResult);
     
@@ -408,9 +416,9 @@ void dataUploadThread(void* arg)
     {
       /* get a curl handle */ 
       curl = curl_easy_init();
-      Beanstalk::Client client(BEANSTALK_QUEUE_HOST, BEANSTALK_PORT);
+      Beanstalk::Client client(udata->beanstalk_host, udata->beanstalk_port);
       
-      client.watch(BEANSTALK_TUBE_NAME);
+      client.watch(udata->beanstalk_queue);
     
       while (daemon_active)
       {

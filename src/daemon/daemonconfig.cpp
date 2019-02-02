@@ -55,6 +55,9 @@ DaemonConfig::DaemonConfig(std::string config_file, std::string config_defaults_
   company_id = getString(&ini, &defaultIni, "daemon", "company_id", "");
   site_id = getString(&ini, &defaultIni, "daemon", "site_id", "");
   pattern = getString(&ini, &defaultIni, "daemon", "pattern", "");
+  beanstalk_host = getString(&ini, &defaultIni, "daemon", "beanstalk_host", "127.0.1.1");
+  beanstalk_port = getInt(&ini, &defaultIni, "daemon", "beanstalk_port", 11300);
+  beanstalk_queue = getString(&ini, &defaultIni, "daemon", "beanstalk_queue", "alprd");
 }
 
 DaemonConfig::~DaemonConfig() {

@@ -12,9 +12,9 @@ public:
   virtual ~DaemonConfig();
 
   std::vector<std::string> stream_urls;
-  
+
   std::string country;
-  
+
   int topn;
   int analysis_threads;
   bool storePlates;
@@ -24,7 +24,10 @@ public:
   std::string company_id;
   std::string site_id;
   std::string pattern;
-  
+  std::string beanstalk_host;
+  int beanstalk_port;
+  std::string beanstalk_queue;
+
 private:
 
 };
